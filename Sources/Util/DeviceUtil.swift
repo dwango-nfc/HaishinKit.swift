@@ -43,13 +43,9 @@ extension AVCaptureDevice {
     }
 }
 
-public struct DeviceUtil {
-    public static func device(withPosition: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        AVCaptureDevice.devices().first {
-            $0.hasMediaType(.video) && $0.position == withPosition
-        }
-    }
-
+/// The namespace of DeviceUtil.
+public enum DeviceUtil {
+    /// Lookup device by localizedName and mediaType.
     public static func device(withLocalizedName: String, mediaType: AVMediaType) -> AVCaptureDevice? {
         AVCaptureDevice.devices().first {
             $0.hasMediaType(mediaType) && $0.localizedName == withLocalizedName
