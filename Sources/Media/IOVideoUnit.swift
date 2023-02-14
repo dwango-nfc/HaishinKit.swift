@@ -34,6 +34,8 @@ final class IOVideoUnit: NSObject, IOUnit {
             codec.formatDescription = formatDescription
         }
     }
+    
+    var stillImageBuffer: CVImageBuffer?
 
     lazy var codec: VideoCodec = {
         var codec = VideoCodec()
@@ -224,7 +226,8 @@ final class IOVideoUnit: NSObject, IOUnit {
     }
 
     func appendSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
-        guard let buffer = sampleBuffer.imageBuffer else {
+        // If there is still image data, use it
+        guard let buffer = stillImageBuffer ?? CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }
         var imageBuffer: CVImageBuffer?
