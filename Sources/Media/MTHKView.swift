@@ -103,7 +103,8 @@ extension MTHKView: MTKViewDelegate {
             let renderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: currentRenderPassDescriptor) {
             renderCommandEncoder.endEncoding()
         }
-        guard let imageBuffer = currentSampleBuffer?.imageBuffer else {
+        // use stillImageBuffer if it's not nil
+        guard let imageBuffer = currentStream?.mixer.videoIO.stillImageBuffer ?? currentSampleBuffer?.imageBuffer else {
             commandBuffer.present(currentDrawable)
             commandBuffer.commit()
             return

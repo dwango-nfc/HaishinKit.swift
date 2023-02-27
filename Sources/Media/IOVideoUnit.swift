@@ -227,7 +227,7 @@ final class IOVideoUnit: NSObject, IOUnit {
 
     func appendSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
         // If there is still image data, use it
-        guard let buffer = stillImageBuffer ?? CMSampleBufferGetImageBuffer(sampleBuffer) else {
+        guard let buffer = stillImageBuffer ?? sampleBuffer.imageBuffer else {
             return
         }
         var imageBuffer: CVImageBuffer?
