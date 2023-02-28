@@ -1,73 +1,57 @@
 import AVFoundation
 
+/**
+ * The interface a AudioCodec uses to inform its delegate.
+ */
 public protocol AudioCodecDelegate: AnyObject {
+    /// Tells the receiver to set a formatDescription.
     func audioCodec(_ codec: AudioCodec, didSet formatDescription: CMFormatDescription?)
+    /// Tells the receiver to output a encoded or decoded sampleBuffer.
     func audioCodec(_ codec: AudioCodec, didOutput sample: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime)
 }
 
 // MARK: -
 /**
- - seealse:
-  - https://developer.apple.com/library/ios/technotes/tn2236/_index.html
+ * The AudioCodec translate audio data to another format.
+ * - seealso: https://developer.apple.com/library/ios/technotes/tn2236/_index.html
  */
 public class AudioCodec {
+    /// The AudioCodec  error domain codes.
     enum Error: Swift.Error {
         case setPropertyError(id: AudioConverterPropertyID, status: OSStatus)
     }
 
-    public enum Option: String, KeyPathRepresentable {
-        case muted
-        case bitrate
-        case sampleRate
-        case actualBitrate
-
-        public var keyPath: AnyKeyPath {
-            switch self {
-            case .muted:
-                return \AudioCodec.muted
-            case .bitrate:
-                return \AudioCodec.bitrate
-            case .sampleRate:
-                return \AudioCodec.sampleRate
-            case .actualBitrate:
-                return \AudioCodec.actualBitrate
-            }
-        }
-    }
-
+    /// The default minimum bitrate for an AudioCodec, value is 8000.
     public static let minimumBitrate: UInt32 = 8 * 1000
-    public static let defaultBitrate: UInt32 = 32 * 1000
-    /// 0 means according to a input source
+    /// The default channels for an AudioCodec, the value is 0 means  according to a input source.
     public static let defaultChannels: UInt32 = 0
-    /// 0 means according to a input source
+    /// The default sampleRate for an AudioCodec, the value is 0 means according to a input source.
     public static let defaultSampleRate: Double = 0
+    /// The default mamimu buffers for an AudioCodec.
     public static let defaultMaximumBuffers: Int = 1
 
-    public var destination: Destination = .aac
-    public weak var delegate: AudioCodecDelegate?
-    public private(set) var isRunning: Atomic<Bool> = .init(false)
-    public var settings: Setting<AudioCodec, Option> = [:] {
-        didSet {
-            settings.observer = self
-        }
-    }
     private static let numSamples: Int = 1024
 
-    var muted = false
-    var bitrate: UInt32 = AudioCodec.defaultBitrate {
+    /// Specifies the output format.
+    public var destination: AudioCodecFormat = .aac
+    /// Specifies the delegate.
+    public weak var delegate: AudioCodecDelegate?
+    public private(set) var isRunning: Atomic<Bool> = .init(false)
+    /// Specifies the settings for audio codec.
+    public var settings: AudioCodecSettings = .default {
         didSet {
-            guard bitrate != oldValue else {
-                return
-            }
-            lockQueue.async {
-                if let format = self._inDestinationFormat {
-                    self.setBitrateUntilNoErr(self.bitrate * format.mChannelsPerFrame)
+            if settings.bitRate != oldValue.bitRate {
+                lockQueue.async {
+                    if let format = self._inDestinationFormat {
+                        self.setBitrateUntilNoErr(self.settings.bitRate * format.mChannelsPerFrame)
+                    }
                 }
             }
         }
     }
+
     var sampleRate: Double = AudioCodec.defaultSampleRate
-    var actualBitrate: UInt32 = AudioCodec.defaultBitrate {
+    var actualBitrate: UInt32 = AudioCodecSettings.default.bitRate {
         didSet {
             logger.info(actualBitrate)
         }
@@ -94,13 +78,13 @@ public class AudioCodec {
             logger.info("\(String(describing: inSourceFormat))")
             let nonInterleaved = inSourceFormat.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0
             maximumBuffers = nonInterleaved ? Int(inSourceFormat.mChannelsPerFrame) : AudioCodec.defaultMaximumBuffers
-            currentAudioBuffer = AudioBuffer(inSourceFormat, numSamples: AudioCodec.numSamples)
+            currentAudioBuffer = AudioCodecBuffer(inSourceFormat, numSamples: AudioCodec.numSamples)
         }
     }
     var effects: Set<AudioEffect> = []
     private let numSamples = AudioCodec.numSamples
     private var maximumBuffers: Int = AudioCodec.defaultMaximumBuffers
-    private var currentAudioBuffer = AudioBuffer(AudioStreamBasicDescription(mSampleRate: 0, mFormatID: 0, mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0, mBytesPerFrame: 0, mChannelsPerFrame: 1, mBitsPerChannel: 0, mReserved: 0))
+    private var currentAudioBuffer = AudioCodecBuffer(AudioStreamBasicDescription(mSampleRate: 0, mFormatID: 0, mFormatFlags: 0, mBytesPerPacket: 0, mFramesPerPacket: 0, mBytesPerFrame: 0, mChannelsPerFrame: 1, mBitsPerChannel: 0, mReserved: 0))
     private var _inDestinationFormat: AudioStreamBasicDescription?
     private var inDestinationFormat: AudioStreamBasicDescription {
         get {
@@ -124,23 +108,13 @@ public class AudioCodec {
         }
     }
 
-    private var audioStreamPacketDescription = AudioStreamPacketDescription(mStartOffset: 0, mVariableFramesInPacket: 0, mDataByteSize: 0) {
-        didSet {
-            audioStreamPacketDescriptionPointer = UnsafeMutablePointer<AudioStreamPacketDescription>(mutating: &audioStreamPacketDescription)
-        }
-    }
-    private var audioStreamPacketDescriptionPointer: UnsafeMutablePointer<AudioStreamPacketDescription>?
-
+    private var audioStreamPacketDescription = AudioStreamPacketDescription(mStartOffset: 0, mVariableFramesInPacket: 0, mDataByteSize: 0)
     private let inputDataProc: AudioConverterComplexInputDataProc = {(_: AudioConverterRef, ioNumberDataPackets: UnsafeMutablePointer<UInt32>, ioData: UnsafeMutablePointer<AudioBufferList>, outDataPacketDescription: UnsafeMutablePointer<UnsafeMutablePointer<AudioStreamPacketDescription>?>?, inUserData: UnsafeMutableRawPointer?) in
         Unmanaged<AudioCodec>.fromOpaque(inUserData!).takeUnretainedValue().onInputDataForAudioConverter(
             ioNumberDataPackets,
             ioData: ioData,
             outDataPacketDescription: outDataPacketDescription
         )
-    }
-
-    public init() {
-        settings.observer = self
     }
 
     private var _converter: AudioConverterRef?
@@ -155,7 +129,7 @@ public class AudioCodec {
                 &inClassDescriptions,
                 &_converter
             )
-            setBitrateUntilNoErr(bitrate * inDestinationFormat.mChannelsPerFrame)
+            setBitrateUntilNoErr(settings.bitRate * inDestinationFormat.mChannelsPerFrame)
         }
         if status != noErr {
             logger.warn("\(status)")
@@ -163,6 +137,7 @@ public class AudioCodec {
         return _converter!
     }
 
+    /// Encodes bytes data.
     public func encodeBytes(_ bytes: UnsafeMutableRawPointer?, count: Int, presentationTimeStamp: CMTime) {
         guard isRunning.value else {
             currentAudioBuffer.clear()
@@ -172,22 +147,21 @@ public class AudioCodec {
         convert(numSamples * Int(destination.bytesPerFrame), presentationTimeStamp: presentationTimeStamp)
     }
 
+    /// Encodes a CMSampleBuffer.
     public func encodeSampleBuffer(_ sampleBuffer: CMSampleBuffer, offset: Int = 0) {
-        guard let format = sampleBuffer.formatDescription, CMSampleBufferDataIsReady(sampleBuffer) && isRunning.value else {
+        guard let format = sampleBuffer.formatDescription, CMSampleBufferDataIsReady(sampleBuffer) else {
             currentAudioBuffer.clear()
             return
         }
-
         inSourceFormat = format.streamBasicDescription?.pointee
-
+        guard isRunning.value else {
+            return
+        }
         do {
             let numSamples = try currentAudioBuffer.write(sampleBuffer, offset: offset)
             if currentAudioBuffer.isReady {
                 for effect in effects {
                     effect.execute(currentAudioBuffer.input, format: inSourceFormat)
-                }
-                if muted {
-                    currentAudioBuffer.muted()
                 }
                 convert(currentAudioBuffer.maxLength, presentationTimeStamp: currentAudioBuffer.presentationTimeStamp)
             }
@@ -266,11 +240,15 @@ public class AudioCodec {
         }
 
         memcpy(ioData, currentAudioBuffer.input.unsafePointer, currentAudioBuffer.listSize)
-        ioNumberDataPackets.pointee = 1
+        if destination == .pcm {
+            ioNumberDataPackets.pointee = 1
+        } else {
+            ioNumberDataPackets.pointee = UInt32(numSamples)
+        }
 
         if destination == .pcm && outDataPacketDescription != nil {
             audioStreamPacketDescription.mDataByteSize = currentAudioBuffer.input.unsafePointer.pointee.mBuffers.mDataByteSize
-            outDataPacketDescription?.pointee = audioStreamPacketDescriptionPointer
+            outDataPacketDescription?.pointee = withUnsafeMutablePointer(to: &audioStreamPacketDescription) { $0 }
         }
 
         currentAudioBuffer.clear()

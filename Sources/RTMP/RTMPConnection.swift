@@ -1,13 +1,15 @@
 import AVFoundation
 import Foundation
 
-/// flash.net.Responder for Swift
-open class Responder {
+/// The RTMPResponder class provides to use handle RTMPConnection's callback.
+open class RTMPResponder {
+    /// A Handler represents RTMPResponder's callback function.
     public typealias Handler = (_ data: [Any?]) -> Void
 
     private var result: Handler
     private var status: Handler?
 
+    /// Creates a new RTMPResponder object.
     public init(result: @escaping Handler, status: Handler? = nil) {
         self.result = result
         self.status = status
@@ -24,20 +26,28 @@ open class Responder {
 }
 
 // MARK: -
-/// flash.net.NetConnection for Swift
+/// The RTMPConneciton class create a two-way RTMP connection.
 open class RTMPConnection: EventDispatcher {
+    /// The default network's window size for RTMPConnection.
     public static let defaultWindowSizeS: Int64 = 250000
+    /// The supported protocols are rtmp, rtmps, rtmpt and rtmps.
     public static let supportedProtocols: Set<String> = ["rtmp", "rtmps", "rtmpt", "rtmpts"]
+    /// The default RTMP port is 1935.
     public static let defaultPort: Int = 1935
+    /// The default RTMPS port is 443.
     public static let defaultSecurePort: Int = 443
+    /// The default flashVer is FMLE/3.0 (compatible; FMSc/1.0).
     public static let defaultFlashVer: String = "FMLE/3.0 (compatible; FMSc/1.0)"
+    /// The default chunk size for RTMPConnection.
     public static let defaultChunkSizeS: Int = 1024 * 8
+    /// The default capabilities for RTMPConneciton.
     public static let defaultCapabilities: Int = 239
+    /// The default object encoding for RTMPConnection class.
     public static let defaultObjectEncoding: RTMPObjectEncoding = .amf0
 
     /**
-      - NetStatusEvent#info.code for NetConnection
-        - see: https://help.adobe.com/en_US/air/reference/html/flash/events/NetStatusEvent.html#NET_STATUS
+     - NetStatusEvent#info.code for NetConnection
+     - see: https://help.adobe.com/en_US/air/reference/html/flash/events/NetStatusEvent.html#NET_STATUS
      */
     public enum Code: String {
         case callBadVersion       = "NetConnection.Call.BadVersion"
@@ -145,43 +155,52 @@ open class RTMPConnection: EventDispatcher {
         return command
     }
 
-    /// The URL of .swf.
-    open var swfUrl: String?
-    /// The URL of an HTTP referer.
-    open var pageUrl: String?
-    /// The time to wait for TCP/IP Handshake done.
-    open var timeout: Int {
-        get { socket.timeout }
-        set { socket.timeout = newValue }
+    /// Specifies the URL of .swf.
+    public var swfUrl: String?
+    /// Specifies the URL of an HTTP referer.
+    public var pageUrl: String?
+    /// Specifies the time to wait for TCP/IP Handshake done.
+    public var timeout: Int {
+        get {
+            socket.timeout
+        }
+        set {
+            socket.timeout = newValue
+        }
     }
-    open var qualityOfService: DispatchQoS {
-        get { socket.qualityOfService }
-        set { socket.qualityOfService = newValue }
+    /// Specifies the dispatchQos for socket.
+    public var qualityOfService: DispatchQoS {
+        get {
+            socket.qualityOfService
+        }
+        set {
+            socket.qualityOfService = newValue
+        }
     }
-    /// The name of application.
-    open var flashVer: String = RTMPConnection.defaultFlashVer
-    /// The outgoing RTMPChunkSize.
-    open var chunkSize: Int = RTMPConnection.defaultChunkSizeS
-    /// The URI passed to the Self.connect() method.
-    open private(set) var uri: URL?
-    /// This instance connected to server(true) or not(false).
-    open private(set) var connected = false
-    /// This instance requires Network.framework if possible.
-    open var requireNetworkFramework = false
-    /// The socket optional parameters.
-    open var parameters: Any?
-    /// The object encoding for this RTMPConnection instance.
-    open var objectEncoding: RTMPObjectEncoding = RTMPConnection.defaultObjectEncoding
+    /// Specifies the name of application.
+    public var flashVer: String = RTMPConnection.defaultFlashVer
+    /// Specifies theoutgoing RTMPChunkSize.
+    public var chunkSize: Int = RTMPConnection.defaultChunkSizeS
+    /// Specifies the URI passed to the Self.connect() method.
+    public private(set) var uri: URL?
+    /// Specifies the instance connected to server(true) or not(false).
+    public private(set) var connected = false
+    /// Specifies the instance requires Network.framework if possible.
+    public var requireNetworkFramework = false
+    /// Specifies the socket optional parameters.
+    public var parameters: Any?
+    /// Specifies the object encoding for this RTMPConnection instance.
+    public var objectEncoding: RTMPObjectEncoding = RTMPConnection.defaultObjectEncoding
     /// The statistics of total incoming bytes.
-    open var totalBytesIn: Int64 {
+    public var totalBytesIn: Int64 {
         socket.totalBytesIn.value
     }
     /// The statistics of total outgoing bytes.
-    open var totalBytesOut: Int64 {
+    public var totalBytesOut: Int64 {
         socket.totalBytesOut.value
     }
     /// The statistics of total RTMPStream counts.
-    open var totalStreamsCount: Int {
+    public var totalStreamsCount: Int {
         streams.count
     }
     /// The statistics of outgoing queue bytes per second.
@@ -192,11 +211,11 @@ open class RTMPConnection: EventDispatcher {
     @objc open private(set) dynamic var currentBytesOutPerSecond: Int32 = 0
 
     var socket: RTMPSocketCompatible!
-    var streams: [UInt32: RTMPStream] = [:]
+    var streams: [RTMPStream] = []
     var sequence: Int64 = 0
     var bandWidth: UInt32 = 0
     var streamsmap: [UInt16: UInt32] = [:]
-    var operations: [Int: Responder] = [:]
+    var operations: [Int: RTMPResponder] = [:]
     var windowSizeC: Int64 = RTMPConnection.defaultWindowSizeS {
         didSet {
             guard socket.connected else {
@@ -206,7 +225,7 @@ open class RTMPConnection: EventDispatcher {
                 type: .zero,
                 streamId: RTMPChunk.StreamID.control.rawValue,
                 message: RTMPWindowAcknowledgementSizeMessage(UInt32(windowSizeC))
-            ), locked: nil)
+            ))
         }
     }
     var windowSizeS: Int64 = RTMPConnection.defaultWindowSizeS
@@ -241,6 +260,7 @@ open class RTMPConnection: EventDispatcher {
     private var previousTotalBytesIn: Int64 = 0
     private var previousTotalBytesOut: Int64 = 0
 
+    /// Creates a new connection.
     override public init() {
         super.init()
         addEventListener(.rtmpStatus, selector: #selector(on(status:)))
@@ -253,7 +273,7 @@ open class RTMPConnection: EventDispatcher {
     }
 
     /// Calls a command or method on RTMP Server.
-    open func call(_ commandName: String, responder: Responder?, arguments: Any?...) {
+    open func call(_ commandName: String, responder: RTMPResponder?, arguments: Any?...) {
         guard connected else {
             return
         }
@@ -269,7 +289,7 @@ open class RTMPConnection: EventDispatcher {
         if responder != nil {
             operations[message.transactionId] = responder
         }
-        socket.doOutput(chunk: RTMPChunk(message: message), locked: nil)
+        socket.doOutput(chunk: RTMPChunk(message: message))
     }
 
     /// Creates a two-way connection to an application on RTMP Server.
@@ -291,6 +311,14 @@ open class RTMPConnection: EventDispatcher {
             }
         }
         socket.delegate = self
+        var outputBufferSize: Int = 0
+        for stream in streams {
+            // in bytes.
+            outputBufferSize += Int(stream.mixer.videoIO.codec.settings.bitRate + stream.mixer.audioIO.codec.settings.bitRate) / 8
+        }
+        if socket.outputBufferSize < outputBufferSize {
+            socket.outputBufferSize = outputBufferSize
+        }
         socket.setProperty(parameters, forKey: "parameters")
         let secure = uri.scheme == "rtmps" || uri.scheme == "rtmpts"
         socket.securityLevel = secure ? .negotiatedSSL : .none
@@ -311,20 +339,18 @@ open class RTMPConnection: EventDispatcher {
         if !isDisconnected {
             uri = nil
         }
-        for (_, stream) in streams {
+        for stream in streams {
             stream.close()
         }
         socket.close(isDisconnected: false)
-        streams.removeAll()
     }
 
     func createStream(_ stream: RTMPStream) {
-        let responder = Responder(result: { data -> Void in
+        let responder = RTMPResponder(result: { data -> Void in
             guard let id: Double = data[0] as? Double else {
                 return
             }
             stream.id = UInt32(id)
-            self.streams[stream.id] = stream
             stream.readyState = .open
         })
         call("createStream", responder: responder)
@@ -348,7 +374,7 @@ open class RTMPConnection: EventDispatcher {
                 type: .zero,
                 streamId: RTMPChunk.StreamID.control.rawValue,
                 message: RTMPSetChunkSizeMessage(UInt32(socket.chunkSizeS))
-            ), locked: nil)
+            ))
         case .some(.connectRejected):
             guard
                 let uri: URL = uri,
@@ -433,34 +459,34 @@ open class RTMPConnection: EventDispatcher {
         previousTotalBytesIn = totalBytesIn
         previousTotalBytesOut = totalBytesOut
         previousQueueBytesOut.append(socket.queueBytesOut.value)
-        for (_, stream) in streams {
+        for stream in streams {
             stream.on(timer: timer)
         }
         if measureInterval <= previousQueueBytesOut.count {
-            var total: Int = 0
+            var total = 0
             for i in 0..<previousQueueBytesOut.count - 1 where previousQueueBytesOut[i] < previousQueueBytesOut[i + 1] {
                 total += 1
             }
             if total == measureInterval - 1 {
-                for (_, stream) in streams {
-                    stream.delegate?.rtmpStream(stream, didPublishInsufficientBW: self)
+                for stream in streams {
+                    stream.delegate?.rtmpStream(stream, publishInsufficientBWOccured: self)
                 }
             } else if total == 0 {
-                for (_, stream) in streams {
-                    stream.delegate?.rtmpStream(stream, didPublishSufficientBW: self)
+                for stream in streams {
+                    stream.delegate?.rtmpStream(stream, publishSufficientBWOccured: self)
                 }
             }
             previousQueueBytesOut.removeFirst()
         }
-        for (_, stream) in streams {
-            stream.delegate?.rtmpStream(stream, didStatics: self)
+        for stream in streams {
+            stream.delegate?.rtmpStream(stream, updatedStats: self)
         }
     }
 }
 
 extension RTMPConnection: RTMPSocketDelegate {
     // MARK: RTMPSocketDelegate
-    func didSetReadyState(_ readyState: RTMPSocketReadyState) {
+    func socket(_ socket: RTMPSocketCompatible, readyState: RTMPSocketReadyState) {
         if logger.isEnabledFor(level: .debug) {
             logger.debug(readyState)
         }
@@ -470,7 +496,7 @@ extension RTMPConnection: RTMPSocketDelegate {
                 close()
                 break
             }
-            socket.doOutput(chunk: chunk, locked: nil)
+            socket.doOutput(chunk: chunk)
         case .closed:
             connected = false
             sequence = 0
@@ -486,7 +512,7 @@ extension RTMPConnection: RTMPSocketDelegate {
         }
     }
 
-    func didSetTotalBytesIn(_ totalBytesIn: Int64) {
+    func socket(_ socket: RTMPSocketCompatible, totalBytesIn: Int64) {
         guard windowSizeS * (sequence + 1) <= totalBytesIn else {
             return
         }
@@ -494,17 +520,17 @@ extension RTMPConnection: RTMPSocketDelegate {
             type: sequence == 0 ? .zero : .one,
             streamId: RTMPChunk.StreamID.control.rawValue,
             message: RTMPAcknowledgementMessage(UInt32(totalBytesIn))
-        ), locked: nil)
+        ))
         sequence += 1
     }
 
-    func listen(_ data: Data) {
-        guard let chunk: RTMPChunk = currentChunk ?? RTMPChunk(data, size: socket.chunkSizeC) else {
+    func socket(_ socket: RTMPSocketCompatible, data: Data) {
+        guard let chunk = currentChunk ?? RTMPChunk(data, size: socket.chunkSizeC) else {
             socket.inputBuffer.append(data)
             return
         }
 
-        var position: Int = chunk.data.count
+        var position = chunk.data.count
         if (4 <= chunk.data.count) && (chunk.data[1] == 0xFF) && (chunk.data[2] == 0xFF) && (chunk.data[3] == 0xFF) {
             position += 4
         }
@@ -519,7 +545,7 @@ extension RTMPConnection: RTMPSocketDelegate {
             position = chunk.append(data, message: messages[chunk.streamId])
         }
 
-        if let message: RTMPMessage = chunk.message, chunk.ready {
+        if let message = chunk.message, chunk.ready {
             if logger.isEnabledFor(level: .trace) {
                 logger.trace(chunk)
             }
@@ -539,7 +565,7 @@ extension RTMPConnection: RTMPSocketDelegate {
             currentChunk = nil
             messages[chunk.streamId] = message
             if 0 < position && position < data.count {
-                listen(data.advanced(by: position))
+                self.socket(socket, data: data.advanced(by: position))
             }
             return
         }
@@ -553,7 +579,7 @@ extension RTMPConnection: RTMPSocketDelegate {
         }
 
         if 0 < position && position < data.count {
-            listen(data.advanced(by: position))
+            self.socket(socket, data: data.advanced(by: position))
         }
     }
 }

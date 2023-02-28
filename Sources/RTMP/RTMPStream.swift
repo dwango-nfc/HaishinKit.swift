@@ -1,33 +1,33 @@
 import AVFoundation
 
+/// The interface a RTMPStream uses to inform its delegate.
 public protocol RTMPStreamDelegate: AnyObject {
-    func rtmpStream(_ stream: RTMPStream, didPublishInsufficientBW connection: RTMPConnection)
-    func rtmpStream(_ stream: RTMPStream, didPublishSufficientBW connection: RTMPConnection)
+    /// Tells the receiver to publish insufficient bandwidth occured.
+    func rtmpStream(_ stream: RTMPStream, publishInsufficientBWOccured connection: RTMPConnection)
+    /// Tells the receiver to publish sufficient bandwidth occured.
+    func rtmpStream(_ stream: RTMPStream, publishSufficientBWOccured connection: RTMPConnection)
+    /// Tells the receiver to playback an audio packet incoming.
     func rtmpStream(_ stream: RTMPStream, didOutput audio: AVAudioBuffer, presentationTimeStamp: CMTime)
+    /// Tells the receiver to playback a video packet incoming.
     func rtmpStream(_ stream: RTMPStream, didOutput video: CMSampleBuffer)
-    func rtmpStream(_ stream: RTMPStream, didStatics connection: RTMPConnection)
+    /// Tells the receiver to update statistics.
+    func rtmpStream(_ stream: RTMPStream, updatedStats connection: RTMPConnection)
+    #if os(iOS)
+    /// Tells the receiver to session was interrupted.
+    func rtmpStream(_ stream: RTMPStream, sessionWasInterrupted session: AVCaptureSession, reason: AVCaptureSession.InterruptionReason)
+    /// Tells the receiver to session interrupted ended.
+    func rtmpStream(_ stream: RTMPStream, sessionInterruptionEnded session: AVCaptureSession, reason: AVCaptureSession.InterruptionReason)
+    #endif
+    /// Tells the receiver to video codec error occured.
+    func rtmpStream(_ stream: RTMPStream, videoCodecErrorOccurred error: VideoCodec.Error)
+    /// Tells the receiver to the stream opend.
     func rtmpStreamDidClear(_ stream: RTMPStream)
 }
 
-public extension RTMPStreamDelegate {
-    func rtmpStream(_ stream: RTMPStream, didStatics connection: RTMPConnection) {
-    }
-
-    func rtmpStream(_ stream: RTMPStream, didOutput audio: AVAudioBuffer, presentationTimeStamp: CMTime) {
-    }
-
-    func rtmpStream(_ stream: RTMPStream, didOutput video: CMSampleBuffer) {
-    }
-}
-
-/**
- flash.net.NetStream for Swift
- */
+/// An object that provides the interface to control a one-way channel over a RtmpConnection.
 open class RTMPStream: NetStream {
-    /**
-      - NetStatusEvent#info.code for NetStream
-        - see: https://help.adobe.com/en_US/air/reference/html/flash/events/NetStatusEvent.html#NET_STATUS
-     */
+    /// NetStatusEvent#info.code for NetStream
+    /// - seealso: https://help.adobe.com/en_US/air/reference/html/flash/events/NetStatusEvent.html#NET_STATUS
     public enum Code: String {
         case bufferEmpty               = "NetStream.Buffer.Empty"
         case bufferFlush               = "NetStream.Buffer.Flush"
@@ -161,38 +161,16 @@ open class RTMPStream: NetStream {
         }
     }
 
-    /**
-     flash.net.NetStreamPlayTransitions for Swift
-     */
-    public enum PlayTransition: String {
-        case append
-        case appendAndWait
-        case reset
-        case resume
-        case stop
-        case swap
-        case `switch`
-    }
-
-    public struct PlayOption: CustomDebugStringConvertible {
-        public var len: Double = 0
-        public var offset: Double = 0
-        public var oldStreamName: String = ""
-        public var start: Double = 0
-        public var streamName: String = ""
-        public var transition: PlayTransition = .switch
-
-        public var debugDescription: String {
-            Mirror(reflecting: self).debugDescription
-        }
-    }
-
+    /// The type of publish options.
     public enum HowToPublish: String {
+        /// Publish with server-side recording.
         case record
+        /// Publish with server-side recording which is to append file if exists.
         case append
+        /// Publish with server-side recording which is to append and ajust time file if exists.
         case appendWithGap
+        /// Publish.
         case live
-        case localRecord
     }
 
     enum ReadyState: UInt8 {
@@ -205,17 +183,22 @@ open class RTMPStream: NetStream {
     }
 
     static let defaultID: UInt32 = 0
-    public static let defaultAudioBitrate: UInt32 = AudioCodec.defaultBitrate
-    public static let defaultVideoBitrate: UInt32 = VideoCodec.defaultBitrate
-
-    open weak var delegate: RTMPStreamDelegate?
-    open internal(set) var info = RTMPStreamInfo()
-    open private(set) var objectEncoding: RTMPObjectEncoding = RTMPConnection.defaultObjectEncoding
+    /// Specifies the delegate of the RTMPStream.
+    public weak var delegate: RTMPStreamDelegate?
+    /// The NetStreamInfo object whose properties contain data.
+    public internal(set) var info = RTMPStreamInfo()
+    /// The object encoding (AMF). Framework supports AMF0 only.
+    public private(set) var objectEncoding: RTMPObjectEncoding = RTMPConnection.defaultObjectEncoding
     /// The number of frames per second being displayed.
-    @objc open private(set) dynamic var currentFPS: UInt16 = 0
-    open var soundTransform: SoundTransform {
-        get { mixer.audioIO.soundTransform }
-        set { mixer.audioIO.soundTransform = newValue }
+    @objc public private(set) dynamic var currentFPS: UInt16 = 0
+    /// Specifies the controls sound.
+    public var soundTransform: SoundTransform {
+        get {
+            mixer.audioIO.soundTransform
+        }
+        set {
+            mixer.audioIO.soundTransform = newValue
+        }
     }
     /// Incoming audio plays on the stream or not.
     open var receiveAudio = true {
@@ -224,14 +207,14 @@ open class RTMPStream: NetStream {
                 guard self.readyState == .playing else {
                     return
                 }
-                self.rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: RTMPCommandMessage(
+                self.rtmpConnection?.socket.doOutput(chunk: RTMPChunk(message: RTMPCommandMessage(
                     streamId: self.id,
                     transactionId: 0,
                     objectEncoding: self.objectEncoding,
                     commandName: "receiveAudio",
                     commandObject: nil,
                     arguments: [self.receiveAudio]
-                )), locked: nil)
+                )))
             }
         }
     }
@@ -242,14 +225,14 @@ open class RTMPStream: NetStream {
                 guard self.readyState == .playing else {
                     return
                 }
-                self.rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: RTMPCommandMessage(
+                self.rtmpConnection?.socket.doOutput(chunk: RTMPChunk(message: RTMPCommandMessage(
                     streamId: self.id,
                     transactionId: 0,
                     objectEncoding: self.objectEncoding,
                     commandName: "receiveVideo",
                     commandObject: nil,
                     arguments: [self.receiveVideo]
-                )), locked: nil)
+                )))
             }
         }
     }
@@ -259,8 +242,8 @@ open class RTMPStream: NetStream {
             lockQueue.async {
                 switch self.readyState {
                 case .publish, .publishing:
-                    self.mixer.audioIO.codec.muted = self.paused
-                    self.mixer.videoIO.encoder.muted = self.paused
+                    self.hasVideo = self.paused
+                    self.hasAudio = self.paused
                 default:
                     break
                 }
@@ -277,31 +260,35 @@ open class RTMPStream: NetStream {
         }
     }
     var audioTimestamp: Double = 0.0
+    var audioTimestampZero: Double = -1.0
     var videoTimestamp: Double = 0.0
+    var videoTimestampZero: Double = -1.0
     private let muxer = RTMPMuxer()
     private var messages: [RTMPCommandMessage] = []
     private var frameCount: UInt16 = 0
-    private var dispatcher: IEventDispatcher!
+    private var dispatcher: EventDispatcherConvertible!
     private var audioWasSent = false
     private var videoWasSent = false
     private var howToPublish: RTMPStream.HowToPublish = .live
-    private var rtmpConnection: RTMPConnection
+    private weak var rtmpConnection: RTMPConnection?
 
+    /// Creates a new stream.
     public init(connection: RTMPConnection) {
         self.rtmpConnection = connection
         super.init()
         dispatcher = EventDispatcher(target: self)
+        connection.streams.append(self)
         addEventListener(.rtmpStatus, selector: #selector(on(status:)), observer: self)
-        rtmpConnection.addEventListener(.rtmpStatus, selector: #selector(on(status:)), observer: self)
-        if rtmpConnection.connected {
-            rtmpConnection.createStream(self)
+        rtmpConnection?.addEventListener(.rtmpStatus, selector: #selector(on(status:)), observer: self)
+        if rtmpConnection?.connected == true {
+            rtmpConnection?.createStream(self)
         }
     }
 
     deinit {
         mixer.stopRunning()
         removeEventListener(.rtmpStatus, selector: #selector(on(status:)), observer: self)
-        rtmpConnection.removeEventListener(.rtmpStatus, selector: #selector(on(status:)), observer: self)
+        rtmpConnection?.removeEventListener(.rtmpStatus, selector: #selector(on(status:)), observer: self)
     }
 
     /// Plays a live stream from RTMPServer.
@@ -334,7 +321,7 @@ open class RTMPStream: NetStream {
                 self.messages.append(message)
             default:
                 self.readyState = .play
-                self.rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: message), locked: nil)
+                self.rtmpConnection?.socket.doOutput(chunk: RTMPChunk(message: message))
             }
         }
     }
@@ -345,14 +332,14 @@ open class RTMPStream: NetStream {
             guard self.readyState == .playing else {
                 return
             }
-            self.rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: RTMPCommandMessage(
+            self.rtmpConnection?.socket.doOutput(chunk: RTMPChunk(message: RTMPCommandMessage(
                 streamId: self.id,
                 transactionId: 0,
                 objectEncoding: self.objectEncoding,
                 commandName: "seek",
                 commandObject: nil,
                 arguments: [offset]
-            )), locked: nil)
+            )))
         }
     }
 
@@ -371,13 +358,6 @@ open class RTMPStream: NetStream {
             }
 
             if self.info.resourceName == name && self.readyState == .publishing {
-                switch type {
-                case .localRecord:
-                    self.mixer.recorder.fileName = FilenameUtil.fileName(resourceName: self.info.resourceName)
-                    self.mixer.recorder.startRunning()
-                default:
-                    self.mixer.recorder.stopRunning()
-                }
                 self.howToPublish = type
                 return
             }
@@ -391,7 +371,7 @@ open class RTMPStream: NetStream {
                 objectEncoding: self.objectEncoding,
                 commandName: "publish",
                 commandObject: nil,
-                arguments: [name, type == .localRecord ? RTMPStream.HowToPublish.live.rawValue : type.rawValue]
+                arguments: [name, type.rawValue]
             )
 
             switch self.readyState {
@@ -399,7 +379,7 @@ open class RTMPStream: NetStream {
                 self.messages.append(message)
             default:
                 self.readyState = .publish
-                self.rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: message), locked: nil)
+                self.rtmpConnection?.socket.doOutput(chunk: RTMPChunk(message: message))
             }
         }
     }
@@ -412,34 +392,38 @@ open class RTMPStream: NetStream {
     /// Sends a message on a published stream to all subscribing clients.
     open func send(handlerName: String, arguments: Any?...) {
         lockQueue.async {
-            guard self.readyState == .publishing else {
+            guard let rtmpConnection = self.rtmpConnection, self.readyState == .publishing else {
                 return
             }
-            let length: Int = self.rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: RTMPDataMessage(
+            let length = rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: RTMPDataMessage(
                 streamId: self.id,
                 objectEncoding: self.objectEncoding,
                 handlerName: handlerName,
                 arguments: arguments
-            )), locked: nil)
+            )))
             self.info.byteCount.mutate { $0 += Int64(length) }
         }
     }
 
+    /// Creates flv metadata for a stream.
     open func createMetaData() -> ASObject {
-        metadata.removeAll()
-#if os(iOS) || os(macOS)
-        if let _: AVCaptureInput = mixer.videoIO.input {
-            metadata["width"] = mixer.videoIO.encoder.width
-            metadata["height"] = mixer.videoIO.encoder.height
-            metadata["framerate"] = mixer.videoIO.fps
+        var metadata: [String: Any] = [:]
+        #if os(iOS) || os(macOS)
+        if mixer.videoIO.capture.device != nil {
+            metadata["width"] = mixer.videoIO.codec.settings.videoSize.width
+            metadata["height"] = mixer.videoIO.codec.settings.videoSize.height
+            metadata["framerate"] = mixer.videoIO.frameRate
             metadata["videocodecid"] = FLVVideoCodec.avc.rawValue
-            metadata["videodatarate"] = mixer.videoIO.encoder.bitrate / 1000
+            metadata["videodatarate"] = mixer.videoIO.codec.settings.bitRate / 1000
         }
-        if let _: AVCaptureInput = mixer.audioIO.input {
+        if mixer.audioIO.capture.device != nil {
             metadata["audiocodecid"] = FLVAudioCodec.aac.rawValue
-            metadata["audiodatarate"] = mixer.audioIO.codec.bitrate / 1000
+            metadata["audiodatarate"] = mixer.audioIO.codec.settings.bitRate / 1000
+            if let sampleRate = mixer.audioIO.codec.inSourceFormat?.mSampleRate {
+                metadata["audiosamplerate"] = sampleRate
+            }
         }
-#endif
+        #endif
         return metadata
     }
 
@@ -450,21 +434,21 @@ open class RTMPStream: NetStream {
             }
             return
         }
-        guard ReadyState.open.rawValue < readyState.rawValue else {
+        guard let rtmpConnection, ReadyState.open.rawValue < readyState.rawValue else {
             return
         }
         readyState = .open
         rtmpConnection.socket?.doOutput(chunk: RTMPChunk(
-            type: .zero,
-            streamId: RTMPChunk.StreamID.command.rawValue,
-            message: RTMPCommandMessage(
-                streamId: 0,
-                transactionId: 0,
-                objectEncoding: self.objectEncoding,
-                commandName: "closeStream",
-                commandObject: nil,
-                arguments: [self.id]
-        )), locked: nil)
+                                            type: .zero,
+                                            streamId: RTMPChunk.StreamID.command.rawValue,
+                                            message: RTMPCommandMessage(
+                                                streamId: 0,
+                                                transactionId: 0,
+                                                objectEncoding: self.objectEncoding,
+                                                commandName: "closeStream",
+                                                commandObject: nil,
+                                                arguments: [self.id]
+                                            )))
     }
 
     func on(timer: Timer) {
@@ -474,19 +458,16 @@ open class RTMPStream: NetStream {
     }
 
     private func didChangeReadyState(_ readyState: ReadyState, oldValue: ReadyState) {
+        guard let rtmpConnection else {
+            return
+        }
+
         switch oldValue {
         case .playing:
             mixer.stopDecoding()
         case .publishing:
             FCUnpublish()
-            #if os(iOS)
-                mixer.videoIO.screen?.stopRunning()
-            #endif
-            mixer.audioIO.codec.delegate = nil
-            mixer.videoIO.encoder.delegate = nil
-            mixer.audioIO.codec.stopRunning()
-            mixer.videoIO.encoder.stopRunning()
-            mixer.recorder.stopRunning()
+            mixer.stopEncoding()
         default:
             break
         }
@@ -509,32 +490,26 @@ open class RTMPStream: NetStream {
                 default:
                     break
                 }
-                rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: message), locked: nil)
+                rtmpConnection.socket.doOutput(chunk: RTMPChunk(message: message))
             }
             messages.removeAll()
-        case .playing:
+        case .play:
+            videoTimestamp = 0
+            videoTimestampZero = -1.0
+            audioTimestamp = 0
+            audioTimestampZero = -1.0
             mixer.delegate = self
             mixer.startDecoding(rtmpConnection.audioEngine)
         case .publish:
             muxer.dispose()
             muxer.delegate = self
-            #if os(iOS)
-                mixer.videoIO.screen?.startRunning()
-            #endif
-            mixer.audioIO.codec.delegate = muxer
-            mixer.videoIO.encoder.delegate = muxer
             mixer.startRunning()
             videoWasSent = false
             audioWasSent = false
             FCPublish()
         case .publishing:
             send(handlerName: "@setDataFrame", arguments: "onMetaData", createMetaData())
-            mixer.audioIO.codec.startRunning()
-            mixer.videoIO.encoder.startRunning()
-            if howToPublish == .localRecord {
-                mixer.recorder.fileName = FilenameUtil.fileName(resourceName: info.resourceName)
-                mixer.recorder.startRunning()
-            }
+            mixer.startEncoding(muxer)
         default:
             break
         }
@@ -542,8 +517,11 @@ open class RTMPStream: NetStream {
 
     @objc
     private func on(status: Notification) {
+        guard let rtmpConnection else {
+            return
+        }
         let e = Event.from(status)
-        guard let data: ASObject = e.data as? ASObject, let code: String = data["code"] as? String else {
+        guard let data = e.data as? ASObject, let code = data["code"] as? String else {
             return
         }
         switch code {
@@ -564,21 +542,21 @@ open class RTMPStream: NetStream {
 
 extension RTMPStream {
     func FCPublish() {
-        guard let name: String = info.resourceName, rtmpConnection.flashVer.contains("FMLE/") else {
+        guard let rtmpConnection, let name = info.resourceName, rtmpConnection.flashVer.contains("FMLE/") else {
             return
         }
         rtmpConnection.call("FCPublish", responder: nil, arguments: name)
     }
 
     func FCUnpublish() {
-        guard let name: String = info.resourceName, rtmpConnection.flashVer.contains("FMLE/") else {
+        guard let rtmpConnection, let name = info.resourceName, rtmpConnection.flashVer.contains("FMLE/") else {
             return
         }
         rtmpConnection.call("FCUnpublish", responder: nil, arguments: name)
     }
 }
 
-extension RTMPStream: IEventDispatcher {
+extension RTMPStream: EventDispatcherConvertible {
     // MARK: IEventDispatcher
     public func addEventListener(_ type: Event.Name, selector: Selector, observer: AnyObject? = nil, useCapture: Bool = false) {
         dispatcher.addEventListener(type, selector: selector, observer: observer, useCapture: useCapture)
@@ -599,36 +577,35 @@ extension RTMPStream: IEventDispatcher {
 
 extension RTMPStream: RTMPMuxerDelegate {
     // MARK: RTMPMuxerDelegate
-    func metadata(_ metadata: ASObject) {
-        send(handlerName: "@setDataFrame", arguments: "onMetaData", metadata)
+    func muxer(_ muxer: RTMPMuxer, didSetMetadata: ASObject) {
+        send(handlerName: "@setDataFrame", arguments: "onMetaData", didSetMetadata)
     }
 
-    func sampleOutput(audio buffer: Data, withTimestamp: Double, muxer: RTMPMuxer) {
-        guard readyState == .publishing else {
+    func muxer(_ muxer: RTMPMuxer, didOutputAudio buffer: Data, withTimestamp: Double) {
+        guard let rtmpConnection, readyState == .publishing else {
             return
         }
         let type: FLVTagType = .audio
-        let length: Int = rtmpConnection.socket.doOutput(chunk: RTMPChunk(
+        let length = rtmpConnection.socket.doOutput(chunk: RTMPChunk(
             type: audioWasSent ? .one : .zero,
             streamId: type.streamId,
             message: RTMPAudioMessage(streamId: id, timestamp: UInt32(audioTimestamp), payload: buffer)
-        ), locked: nil)
+        ))
         audioWasSent = true
         info.byteCount.mutate { $0 += Int64(length) }
         audioTimestamp = withTimestamp + (audioTimestamp - floor(audioTimestamp))
     }
 
-    func sampleOutput(video buffer: Data, withTimestamp: Double, muxer: RTMPMuxer) {
-        guard readyState == .publishing else {
+    func muxer(_ muxer: RTMPMuxer, didOutputVideo buffer: Data, withTimestamp: Double) {
+        guard let rtmpConnection, readyState == .publishing else {
             return
         }
         let type: FLVTagType = .video
-        OSAtomicOr32Barrier(1, &mixer.videoIO.encoder.locked)
-        let length: Int = rtmpConnection.socket.doOutput(chunk: RTMPChunk(
+        let length = rtmpConnection.socket.doOutput(chunk: RTMPChunk(
             type: videoWasSent ? .one : .zero,
             streamId: type.streamId,
             message: RTMPVideoMessage(streamId: id, timestamp: UInt32(videoTimestamp), payload: buffer)
-        ), locked: &mixer.videoIO.encoder.locked)
+        ))
         if !videoWasSent {
             logger.debug("first video frame was sent")
         }
@@ -637,18 +614,32 @@ extension RTMPStream: RTMPMuxerDelegate {
         videoTimestamp = withTimestamp + (videoTimestamp - floor(videoTimestamp))
         frameCount += 1
     }
+
+    func muxer(_ muxer: RTMPMuxer, videoCodecErrorOccurred error: VideoCodec.Error) {
+        delegate?.rtmpStream(self, videoCodecErrorOccurred: error)
+    }
 }
 
-extension RTMPStream: AVMixerDelegate {
-    // MARK: AVMixerDelegate
-    func mixer(_ mixer: AVMixer, didOutput video: CMSampleBuffer) {
+extension RTMPStream: IOMixerDelegate {
+    // MARK: IOMixerDelegate
+    func mixer(_ mixer: IOMixer, didOutput video: CMSampleBuffer) {
         frameCount += 1
         delegate?.rtmpStream(self, didOutput: video)
     }
 
-    func mixer(_ mixer: AVMixer, didOutput audio: AVAudioPCMBuffer, presentationTimeStamp: CMTime) {
+    func mixer(_ mixer: IOMixer, didOutput audio: AVAudioPCMBuffer, presentationTimeStamp: CMTime) {
         delegate?.rtmpStream(self, didOutput: audio, presentationTimeStamp: presentationTimeStamp)
     }
+
+    #if os(iOS)
+    func mixer(_ mixer: IOMixer, sessionWasInterrupted session: AVCaptureSession, reason: AVCaptureSession.InterruptionReason) {
+        delegate?.rtmpStream(self, sessionWasInterrupted: session, reason: reason)
+    }
+
+    func mixer(_ mixer: IOMixer, sessionInterruptionEnded session: AVCaptureSession, reason: AVCaptureSession.InterruptionReason) {
+        delegate?.rtmpStream(self, sessionInterruptionEnded: session, reason: reason)
+    }
+    #endif
 }
 
 extension RTMPStream {
