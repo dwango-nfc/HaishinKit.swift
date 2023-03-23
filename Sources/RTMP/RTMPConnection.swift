@@ -61,6 +61,8 @@ open class RTMPConnection: EventDispatcher {
         case connectNetworkChange = "NetConnection.Connect.NetworkChange"
         case connectRejected      = "NetConnection.Connect.Rejected"
         case connectSuccess       = "NetConnection.Connect.Success"
+        case connectBad           = "NetConnection.Connect.Bad"
+        case connectRecovered     = "NetConnection.Connect.Recovered"
 
         public var level: String {
             switch self {
@@ -85,6 +87,10 @@ open class RTMPConnection: EventDispatcher {
             case .connectRejected:
                 return "error"
             case .connectSuccess:
+                return "status"
+            case .connectBad:
+                return "status"
+            case .connectRecovered:
                 return "status"
             }
         }

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // MARK: -
 final class RTMPSocket: NetSocket, RTMPSocketCompatible {
@@ -14,6 +15,7 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
     var chunkSizeS: Int = RTMPChunk.defaultSize
     weak var delegate: RTMPSocketDelegate?
     private var handshake = RTMPHandshake()
+    private var cancellables = Set<AnyCancellable>()
 
     override var totalBytesIn: Atomic<Int64> {
         didSet {
@@ -86,6 +88,17 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
         chunkSizeS = RTMPChunk.defaultSize
         chunkSizeC = RTMPChunk.defaultSize
         super.initConnection()
+        // subscribe the change of badConnection
+        badConnectionChangePublisher
+            .sink { [weak self] value in
+                let data = value ? RTMPConnection.Code.connectBad.data("") : RTMPConnection.Code.connectRecovered.data("")
+                self?.delegate?.dispatch(event: Event(
+                    type: .rtmpStatus,
+                    bubbles: false,
+                    data: data
+                ))
+            }
+            .store(in: &cancellables)
     }
 
     override func deinitConnection(isDisconnected: Bool) {

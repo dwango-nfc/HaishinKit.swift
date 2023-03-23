@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// The NetSocket class creates a two-way connection between a client and a server as a client. This class is wrapper for a InputStream and an OutputStream.
 open class NetSocket: NSObject {
@@ -26,6 +27,8 @@ open class NetSocket: NSObject {
     public private(set) var totalBytesOut: Atomic<Int64> = .init(0)
     /// Specifies  statistics of total outgoing queued bytes.
     public private(set) var queueBytesOut: Atomic<Int64> = .init(0)
+    /// publish the change of 'isBadConnection'
+    public let badConnectionChangePublisher = PassthroughSubject<Bool, Never>()
 
     var inputStream: InputStream? {
         didSet {
@@ -58,6 +61,13 @@ open class NetSocket: NSObject {
     private lazy var buffer = [UInt8](repeating: 0, count: windowSizeC)
     private lazy var outputBuffer: DataBuffer = .init(capacity: outputBufferSize)
     private lazy var outputQueue: DispatchQueue = .init(label: "com.haishinkit.HaishinKit.NetSocket.output", qos: qualityOfService)
+    private var isBadConnection = false {
+        didSet {
+            if oldValue != isBadConnection {
+                badConnectionChangePublisher.send(isBadConnection)
+            }
+        }
+    }
 
     deinit {
         inputStream?.delegate = nil
@@ -88,6 +98,9 @@ open class NetSocket: NSObject {
             self.outputBuffer.append(data)
             if let outputStream = self.outputStream, outputStream.hasSpaceAvailable {
                 self.doOutput(outputStream)
+                self.isBadConnection = false
+            } else {
+                self.isBadConnection = true
             }
         }
         return data.count
