@@ -88,10 +88,10 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
         chunkSizeS = RTMPChunk.defaultSize
         chunkSizeC = RTMPChunk.defaultSize
         super.initConnection()
-        // subscribe the change of badConnection
-        badConnectionChangePublisher
+        // subscribe the change of 'isOutputUnavailable'
+        outputAvailabilityChangePublisher
             .sink { [weak self] value in
-                let data = value ? RTMPConnection.Code.connectBad.data("") : RTMPConnection.Code.connectRecovered.data("")
+                let data = value ? RTMPConnection.Code.outputUnavailable.data("") : RTMPConnection.Code.outputRecovered.data("")
                 self?.delegate?.dispatch(event: Event(
                     type: .rtmpStatus,
                     bubbles: false,
