@@ -7,7 +7,7 @@ let package = Package(
     platforms: [
         .iOS("13.0"),
         .tvOS(.v11),
-        .macOS(.v10_13)
+        .macOS(.v11)
     ],
     products: [
         .library(name: "HaishinKit", targets: ["HaishinKit"])
