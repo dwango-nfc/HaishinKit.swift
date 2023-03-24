@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 // MARK: -
 final class RTMPSocket: NetSocket, RTMPSocketCompatible {
@@ -15,7 +14,18 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
     var chunkSizeS: Int = RTMPChunk.defaultSize
     weak var delegate: RTMPSocketDelegate?
     private var handshake = RTMPHandshake()
-    private var cancellables = Set<AnyCancellable>()
+    private var isOutputUnavailable = false {
+        didSet {
+            if oldValue != isOutputUnavailable {
+                let data = isOutputUnavailable ? RTMPConnection.Code.outputUnavailable.data("") : RTMPConnection.Code.outputRecovered.data("")
+                self.delegate?.dispatch(event: Event(
+                    type: .rtmpStatus,
+                    bubbles: false,
+                    data: data
+                ))
+            }
+        }
+    }
 
     override var totalBytesIn: Atomic<Int64> {
         didSet {
@@ -41,6 +51,7 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
 
     @discardableResult
     func doOutput(chunk: RTMPChunk) -> Int {
+        setOutputAvailability()
         let chunks: [Data] = chunk.split(chunkSizeS)
         for i in 0..<chunks.count - 1 {
             doOutput(data: chunks[i])
@@ -50,6 +61,14 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
             logger.trace(chunk)
         }
         return chunk.message!.length
+    }
+    
+    private func setOutputAvailability() {
+        if let outputStream = self.outputStream, outputStream.hasSpaceAvailable {
+            isOutputUnavailable = false
+        } else {
+            isOutputUnavailable = true
+        }
     }
 
     override func listen() {
@@ -88,17 +107,6 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
         chunkSizeS = RTMPChunk.defaultSize
         chunkSizeC = RTMPChunk.defaultSize
         super.initConnection()
-        // subscribe the change of 'isOutputUnavailable'
-        outputAvailabilityChangePublisher
-            .sink { [weak self] value in
-                let data = value ? RTMPConnection.Code.outputUnavailable.data("") : RTMPConnection.Code.outputRecovered.data("")
-                self?.delegate?.dispatch(event: Event(
-                    type: .rtmpStatus,
-                    bubbles: false,
-                    data: data
-                ))
-            }
-            .store(in: &cancellables)
     }
 
     override func deinitConnection(isDisconnected: Bool) {
