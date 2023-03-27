@@ -14,6 +14,18 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
     var chunkSizeS: Int = RTMPChunk.defaultSize
     weak var delegate: RTMPSocketDelegate?
     private var handshake = RTMPHandshake()
+    private var isOutputUnavailable = false {
+        didSet {
+            if oldValue != isOutputUnavailable {
+                let data = isOutputUnavailable ? RTMPConnection.Code.outputUnavailable.data("") : RTMPConnection.Code.outputRecovered.data("")
+                self.delegate?.dispatch(event: Event(
+                    type: .rtmpStatus,
+                    bubbles: false,
+                    data: data
+                ))
+            }
+        }
+    }
 
     override var totalBytesIn: Atomic<Int64> {
         didSet {
@@ -39,6 +51,7 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
 
     @discardableResult
     func doOutput(chunk: RTMPChunk) -> Int {
+        setOutputAvailability()
         let chunks: [Data] = chunk.split(chunkSizeS)
         for i in 0..<chunks.count - 1 {
             doOutput(data: chunks[i])
@@ -48,6 +61,14 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
             logger.trace(chunk)
         }
         return chunk.message!.length
+    }
+    
+    private func setOutputAvailability() {
+        if let outputStream = self.outputStream, outputStream.hasSpaceAvailable {
+            isOutputUnavailable = false
+        } else {
+            isOutputUnavailable = true
+        }
     }
 
     override func listen() {
