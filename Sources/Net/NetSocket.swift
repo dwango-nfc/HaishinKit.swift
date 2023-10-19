@@ -176,6 +176,7 @@ open class NetSocket: NSObject {
 extension NetSocket: StreamDelegate {
     // MARK: StreamDelegate
     public func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+        print("NetSocketStream eventCode: \(eventCode)")
         switch eventCode {
         //  1 = 1 << 0
         case .openCompleted:
