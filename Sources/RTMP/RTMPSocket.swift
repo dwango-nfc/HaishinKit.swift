@@ -53,9 +53,10 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
 
     @discardableResult
     func doOutput(chunk: RTMPChunk) -> Int {
-        setStreamTimer()
+        //setStreamTimer()
         setOutputAvailability()
         let chunks: [Data] = chunk.split(chunkSizeS)
+        print("daf-4480 doOutput chunk: \(chunk.debugDescription)")
         for i in 0..<chunks.count - 1 {
             doOutput(data: chunks[i])
         }
