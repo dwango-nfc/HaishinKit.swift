@@ -26,6 +26,9 @@ open class NetSocket: NSObject {
     public private(set) var totalBytesOut: Atomic<Int64> = .init(0)
     /// Specifies  statistics of total outgoing queued bytes.
     public private(set) var queueBytesOut: Atomic<Int64> = .init(0)
+    
+    private var streamTimer: Timer?
+    private let streamTimeout: Double = 5 // sec
 
     var inputStream: InputStream? {
         didSet {
@@ -171,12 +174,24 @@ open class NetSocket: NSObject {
             outputBuffer.skip(length)
         }
     }
+    
+    private func setStreamTimer() {
+//        streamTimer?.invalidate()
+//        streamTimer = nil
+        print("daf-4480 timer set")
+        streamTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false, block: { [weak self] timer in
+            self?.deinitConnection(isDisconnected: true)
+            print("daf-4480 timer executed")
+            timer.invalidate()
+        })
+    }
 }
 
 extension NetSocket: StreamDelegate {
     // MARK: StreamDelegate
     public func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
 //        print("NetSocketStream eventCode: \(eventCode), timeout: \(timeout), connected: \(connected), windowSizeC: \(windowSizeC), outputBufferSize: \(outputBufferSize), queueBytesOut: \(queueBytesOut.value)")
+        setStreamTimer()
         switch eventCode {
         //  1 = 1 << 0
         case .openCompleted:
