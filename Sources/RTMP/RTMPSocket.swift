@@ -26,6 +26,8 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
             }
         }
     }
+    private var streamTimer: Timer?
+    private let streamTimeout: Double = 5 // sec
 
     override var totalBytesIn: Atomic<Int64> {
         didSet {
@@ -51,6 +53,7 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
 
     @discardableResult
     func doOutput(chunk: RTMPChunk) -> Int {
+        setStreamTimer()
         setOutputAvailability()
         let chunks: [Data] = chunk.split(chunkSizeS)
         for i in 0..<chunks.count - 1 {
@@ -69,6 +72,18 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
         } else {
             isOutputUnavailable = true
         }
+    }
+    
+    private func setStreamTimer() {
+        print("daf-4480 queueBytesOut: \(queueBytesOut.value)")
+//        streamTimer?.invalidate()
+//        streamTimer = nil
+//        print("daf-4480 timer set")
+//        streamTimer = Timer.scheduledTimer(withTimeInterval: streamTimeout, repeats: false, block: { [weak self] timer in
+//            self?.deinitConnection(isDisconnected: true)
+//            timer.invalidate()
+//            print("daf-4480 timer executed")
+//        })
     }
 
     override func listen() {
@@ -110,6 +125,7 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
     }
 
     override func deinitConnection(isDisconnected: Bool) {
+        print("daf-4480 deinitConnection. isDisconnected: \(isDisconnected), readyState: \(readyState)")
         if isDisconnected {
             let data: ASObject = (readyState == .handshakeDone) ?
                 RTMPConnection.Code.connectClosed.data("") : RTMPConnection.Code.connectFailed.data("")
