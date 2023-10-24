@@ -70,7 +70,6 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
         let streamTimeOut = 8
         guard let lastOutputStreamTime else { return }
         let difference = Int(Date().timeIntervalSinceReferenceDate - lastOutputStreamTime.timeIntervalSinceReferenceDate)
-        print("daf-4480 checkStream difference: \(difference)")
         if difference >= streamTimeOut {
             self.lastOutputStreamTime = nil
             deinitConnection(isDisconnected: true)
