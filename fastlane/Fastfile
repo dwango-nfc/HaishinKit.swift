@@ -13,11 +13,9 @@
 # Uncomment the line if you want fastlane to automatically update itself
 # update_fastlane
 
-platform :ios do
-  desc "[CI] Review PullRequest."
-  lane :review do
-    spm
-    carthage(use_xcframeworks: true) if Helper.is_ci?
-    scan(scheme: 'Tests')
-  end
+desc "[CI] Review PullRequest."
+lane :review do
+  spm
+  carthage(use_xcframeworks: true, platform: "iOS") if Helper.is_ci?
+  scan(scheme: 'Tests')
 end
