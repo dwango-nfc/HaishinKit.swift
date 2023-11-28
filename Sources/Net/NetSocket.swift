@@ -58,10 +58,6 @@ open class NetSocket: NSObject {
     private lazy var buffer = [UInt8](repeating: 0, count: windowSizeC)
     private lazy var outputBuffer: DataBuffer = .init(capacity: outputBufferSize)
     private lazy var outputQueue: DispatchQueue = .init(label: "com.haishinkit.HaishinKit.NetSocket.output", qos: qualityOfService)
-    
-    // Detect network disconnection after LSM
-    // https://dw-ml-nfc.atlassian.net/browse/DAF-4480
-    var lastOutputStreamTime: Date?
 
     deinit {
         inputStream?.delegate = nil
@@ -180,11 +176,6 @@ open class NetSocket: NSObject {
 extension NetSocket: StreamDelegate {
     // MARK: StreamDelegate
     public func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
-        // Detect network disconnection after LSM
-        // https://dw-ml-nfc.atlassian.net/browse/DAF-4480
-        if aStream is OutputStream {
-            lastOutputStreamTime = Date()
-        }
         switch eventCode {
         //  1 = 1 << 0
         case .openCompleted:

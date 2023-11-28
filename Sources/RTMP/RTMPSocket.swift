@@ -51,7 +51,6 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
 
     @discardableResult
     func doOutput(chunk: RTMPChunk) -> Int {
-        checkStreamTimeOut()
         setOutputAvailability()
         let chunks: [Data] = chunk.split(chunkSizeS)
         for i in 0..<chunks.count - 1 {
@@ -62,18 +61,6 @@ final class RTMPSocket: NetSocket, RTMPSocketCompatible {
             logger.trace(chunk)
         }
         return chunk.message!.length
-    }
-    
-    // Detect network disconnection after LSM
-    // https://dw-ml-nfc.atlassian.net/browse/DAF-4480
-    private func checkStreamTimeOut() {
-        let streamTimeOut = 8
-        guard let lastOutputStreamTime else { return }
-        let difference = Int(Date().timeIntervalSinceReferenceDate - lastOutputStreamTime.timeIntervalSinceReferenceDate)
-        if difference >= streamTimeOut {
-            self.lastOutputStreamTime = nil
-            deinitConnection(isDisconnected: true)
-        }
     }
     
     private func setOutputAvailability() {
